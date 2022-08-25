@@ -37,14 +37,16 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define INPUT_CURRENT_MAX 920
-#define CELL1_VOLTAGE_MIN 700
-#define CELL2_VOLTAGE_MIN 700
-#define CELLS_VOLTAGE_MIN 1400
-#define OUTPUT_CURRENT_MAX 1890
-#define OUTPUT_VOLTAGE_MAX 2850
-#define OUTPUT_VOLTAGE_MIN 2800
+#define INPUT_CURRENT_MAX 950 //920
+#define CELL1_VOLTAGE_MIN 710 // margine 20
+#define CELL2_VOLTAGE_MIN 696
+#define CELLS_VOLTAGE_MIN 1406
+#define OUTPUT_CURRENT_MAX 1950  //1940
+#define OUTPUT_VOLTAGE_MAX 2890  //2850
+#define OUTPUT_VOLTAGE_MIN 2750  //2800
+#define OUTPUT_VOLTAGE_DELAY 2000  //3000
 #define OUTPUT_CURRENT_FAN_ON 600
+
 
 #define VERSION 100
 /* USER CODE END PD */
@@ -69,6 +71,8 @@ volatile uint16_t adcval[8];
 char RcvData[32];
 char* currentline;
 uint32_t adc_tick=0;
+uint32_t error_para = 0;
+uint32_t error_count = 0;
 
 uint16_t InputCurrent = 0;
 uint16_t Cell1Voltage = 0;
@@ -180,6 +184,9 @@ int main(void)
 
   HAL_Delay(500);
 
+  error_count = HAL_GetTick() ;
+
+
 //  HAL_GPIO_WritePin(OUT_EN_GPIO_Port, OUT_EN_Pin, GPIO_PIN_SET);
 //  HAL_GPIO_WritePin(OUT_EN_GPIO_Port, OUT_EN_Pin, GPIO_PIN_RESET);
   /* USER CODE END 2 */
@@ -193,10 +200,11 @@ int main(void)
     HAL_ADC_Start_DMA(&hadc, &adcval[0], 7);
 
 
-	ssd1306_Fill(Black);
 
 #if 0
-	ssd1306_SetCursor(2, 0);
+	ssd1306_Fill(Black);
+
+    ssd1306_SetCursor(2, 0);
     ssd1306_WriteString("[#ADC TEST@]", Font_6x8, White);
 
     ssd1306_SetCursor(10, 10);
@@ -211,7 +219,12 @@ int main(void)
     ssd1306_SetCursor(10, 44);
 	sprintf(currentline,"%4d %4d %4d",adcval[4],adcval[5],adcval[6]);
     ssd1306_WriteString(currentline, Font_6x8, White);
-#else
+
+    ssd1306_UpdateScreen();
+
+//#else
+
+	ssd1306_Fill(Black);
 
 	ssd1306_SetCursor(2, 0);
 	sprintf(currentline,"[GEN_12A-V%d] %dms",VERSION,uiFramRate);
@@ -224,7 +237,7 @@ int main(void)
 	sprintf(currentline,"IN_A : %4d< %4d",InputCurrent,INPUT_CURRENT_MAX);
     ssd1306_WriteString(currentline, Font_6x8, White);
     ssd1306_SetCursor(10, 28);
-	sprintf(currentline,"OUT_V: %4d< %4d",OutputVoltage,OUTPUT_VOLTAGE_MAX);
+	sprintf(currentline,"OUT_V: %4d> %4d",OutputVoltage,OUTPUT_VOLTAGE_MIN);
     ssd1306_WriteString(currentline, Font_6x8, White);
     ssd1306_SetCursor(10, 37);
 	sprintf(currentline,"OUT_A: %4d< %4d",OutputCurrent,OUTPUT_CURRENT_MAX);
@@ -261,24 +274,87 @@ int main(void)
     	ssd1306_WriteChar('R',Font_6x8,White);
 
     ssd1306_SetCursor(100, 47);
-    sprintf(currentline,"%4d",adcval[5]);
+    sprintf(currentline,"%4d",Cell1Voltage); //,adcval[5]);
     ssd1306_WriteString(currentline, Font_6x8, White);
 
     ssd1306_SetCursor(100, 56);
-    sprintf(currentline,"%4d",adcval[6]);
+    sprintf(currentline,"%4d",Cell2Voltage);
     ssd1306_WriteString(currentline, Font_6x8, White);
 
 //    ssd1306_SetCursor(10, 56);
 //	sprintf(currentline,"%4d %4d",adcval[5],adcval[6]);
 //    ssd1306_WriteString(currentline, Font_6x8, White);
 
+    ssd1306_UpdateScreen();
 
 #endif
 
+    HAL_Delay(10);
 
-    ssd1306_UpdateScreen();
+    printf("%u ms Fr:%dms iV:%d>%d iC:%d<%d oV:%d>%d oC:%d<%d c1:%d>%d c2:%d>%d ",
+    		HAL_GetTick(),uiFramRate,CellsVoltage,CELLS_VOLTAGE_MIN,InputCurrent,INPUT_CURRENT_MAX,
+			OutputVoltage,OUTPUT_VOLTAGE_MIN,OutputCurrent,OUTPUT_CURRENT_MAX,
+			Cell1Voltage,CELL1_VOLTAGE_MIN,Cell2Voltage,CELL2_VOLTAGE_MIN);
 
-    printf("%u ms [ADC TEST] Fr= %dms as= %d ccr= %4d %4d %4d %4d\r\n",HAL_GetTick(),uiFramRate,adc_tick-adc_start_tick,TIM3->CCR1,TIM3->CCR2,TIM3->CCR3,TIM3->CCR4);
+    if( HAL_GPIO_ReadPin(OUT_EN_GPIO_Port,OUT_EN_Pin)== GPIO_PIN_SET )
+    	printf("[OUT_EN]");
+    else
+    	printf("[ OFF  ]");
+
+    if( HAL_GPIO_ReadPin(FAN_GPIO_Port,FAN_Pin)== GPIO_PIN_SET )
+    	printf("[FAN]");
+    else
+    	printf("[off]");
+
+    if( HAL_GPIO_ReadPin(SW_LED_GPIO_Port,SW_LED_Pin)== GPIO_PIN_SET )
+    	printf("[SWLED]");
+    else
+    	printf("[ off ]");
+
+    if( HAL_GPIO_ReadPin(CH1_GREEN_GPIO_Port,CH1_GREEN_Pin)== GPIO_PIN_SET )
+    	printf("G" );
+    if( HAL_GPIO_ReadPin(CH1_RED_GPIO_Port,CH1_RED_Pin)== GPIO_PIN_SET )
+    	printf("R" );
+
+    if( HAL_GPIO_ReadPin(CH2_GREEN_GPIO_Port,CH2_GREEN_Pin)== GPIO_PIN_SET )
+    	printf("G");
+    if( HAL_GPIO_ReadPin(CH2_RED_GPIO_Port,CH2_RED_Pin)== GPIO_PIN_SET )
+    	printf("R" );
+
+
+
+
+
+    if( OutputCurrent > OUTPUT_CURRENT_MAX )
+    {
+    	error_para = error_para | 1;
+    }
+
+    if( OutputVoltage > OUTPUT_VOLTAGE_MAX)
+    {
+//    	error_para = error_para | 2;
+    }
+
+    if( OutputVoltage <= OUTPUT_VOLTAGE_MIN )
+    {
+    	if(HAL_GetTick() - error_count >= OUTPUT_VOLTAGE_DELAY)
+    	{
+    		error_para = error_para | 4;
+    	}
+    }
+    else
+    {
+    	error_count = HAL_GetTick() ;
+    }
+
+	printf(" E%d",error_para  );
+    printf("\r\n");
+
+
+
+//    printf("%u ms [ADC TEST] Fr= %dms as= %d ccr= %4d %4d %4d %4d\r\n",HAL_GetTick(),uiFramRate,adc_tick-adc_start_tick,TIM3->CCR1,TIM3->CCR2,TIM3->CCR3,TIM3->CCR4);
+
+
     uiFramRate = HAL_GetTick() - adc_start_tick;
 //    HAL_Delay(1000);
 
@@ -624,8 +700,8 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 	Cell2Voltage = adcval[4];
 	CellsVoltage = adcval[3];
 
-	OutputVoltage = adcval[1];
-	OutputCurrent = adcval[2];
+	OutputVoltage = adcval[2];
+	OutputCurrent = adcval[1];
 
 	// OUT_EN work
 	if(( InputCurrent <= INPUT_CURRENT_MAX )&&( CellsVoltage >= CELLS_VOLTAGE_MIN )&&
@@ -633,8 +709,10 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 	{
 		/* Check the parameters */
 		// OutputVoltage or OutputCurrent error
-
-		HAL_GPIO_WritePin(OUT_EN_GPIO_Port, OUT_EN_Pin, GPIO_PIN_SET);
+		if( error_para >= 1 )
+			 HAL_GPIO_WritePin(OUT_EN_GPIO_Port, OUT_EN_Pin, GPIO_PIN_RESET);
+		else
+			HAL_GPIO_WritePin(OUT_EN_GPIO_Port, OUT_EN_Pin, GPIO_PIN_SET);
 		//  HAL_GPIO_WritePin(OUT_EN_GPIO_Port, OUT_EN_Pin, GPIO_PIN_RESET);
 	}
 	else
@@ -675,28 +753,28 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc)
 	if(Cell1Voltage > CELL1_VOLTAGE_MIN)
 	{
 		// Green LED On, RED LED Off
-		HAL_GPIO_WritePin(CH1_GREEN_GPIO_Port, CH1_GREEN_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(CH1_RED_GPIO_Port, CH1_RED_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(CH1_GREEN_GPIO_Port, CH1_GREEN_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(CH1_RED_GPIO_Port, CH1_RED_Pin, GPIO_PIN_SET);
 	}
 	else
 	{
 		// Green LED Off, RED LED On
-		HAL_GPIO_WritePin(CH1_GREEN_GPIO_Port, CH1_GREEN_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(CH1_RED_GPIO_Port, CH1_RED_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(CH1_GREEN_GPIO_Port, CH1_GREEN_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(CH1_RED_GPIO_Port, CH1_RED_Pin, GPIO_PIN_RESET);
 	}
 
 	// LED CH2
 	if(Cell2Voltage > CELL2_VOLTAGE_MIN)
 	{
 		// Green LED On, RED LED Off
-		HAL_GPIO_WritePin(CH2_GREEN_GPIO_Port, CH2_GREEN_Pin, GPIO_PIN_SET);
-		HAL_GPIO_WritePin(CH2_RED_GPIO_Port, CH2_RED_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(CH2_GREEN_GPIO_Port, CH2_GREEN_Pin, GPIO_PIN_RESET);
+		HAL_GPIO_WritePin(CH2_RED_GPIO_Port, CH2_RED_Pin, GPIO_PIN_SET);
 	}
 	else
 	{
 		// Green LED Off, RED LED On
-		HAL_GPIO_WritePin(CH2_GREEN_GPIO_Port, CH2_GREEN_Pin, GPIO_PIN_RESET);
-		HAL_GPIO_WritePin(CH2_RED_GPIO_Port, CH2_RED_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(CH2_GREEN_GPIO_Port, CH2_GREEN_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(CH2_RED_GPIO_Port, CH2_RED_Pin, GPIO_PIN_RESET);
 	}
 
 }
