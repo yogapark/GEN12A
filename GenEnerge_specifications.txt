@@ -1,0 +1,43 @@
+1. GEN Energe 제품 사양서.
+
+사용 정보 : ( ADC 정보 ) 
+1. InputCurrent. : 입력 전류
+2. Cell1Voltage. : 셀 전압 1
+3. Cell2Voltage. : 셀 전압 2
+4. CellsVoltage. : 셀 전압 1+2 
+5. OutputVoltage. : 출력 전압
+6. OutputCurrent. : 출력 전류
+
+그외 GPIO pin 상태 정보 사용.
+
+
+
+동작 정보:
+
+
+- 출력 가능 조건.
+1. InputCurrent <= Input_current_Max : [입력 전류]가 [최대 입력 전류]를 넘지 않는다.
+2. CellsVoltage >= CELLS_VOLTAGE_MIN : '배터리의 전압'은 '최소 전압' 이상이여야 한다.
+3. OutputVoltage <= OUTPUT_VOLTAGE_MAX : [출력 전압]은 [최대 출력 전압] 이하여야 한다.
+4. OutputCurrent <= OUTPUT_CURRENT_MAX : [출력 전류]는 [최대 출력 전류] 이하여야한다.
+
+그외 출력 제한 조건 ( error_para >= 1) 이 있으면 출력을 제한한다. 
+
+출력 가능 상태 : OUT_EN_Pin 은 GPIO_PIN_SET.
+
+
+
+- FAN 작업 조건.
+1. Outputcurrent >= OUTPUT_CURRET_FAN_ON : [출력 전류]가 [FAN 동작 전류] 이상일때 동작한다.
+
+
+- SW LED 작업 조건. ( 스위치에 표시된 LED 동작 조건 )
+1. [출력 전압] 이 나가고 있으면 LED ON.
+2. [출력 전압] 이 나가지 않으면 LED 1초에 한번씩 깜빡임.
+
+- LED ch1 작업 조건. 
+1. Cell1Voltage > CELL1_VOLTAGE_MIN : [최소 베터리 전압] 이상일때, Green.
+2. 이하일때 RED
+
+- LED ch2 작업 조건.
+상동. 
